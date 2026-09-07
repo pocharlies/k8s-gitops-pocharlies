@@ -1028,9 +1028,11 @@ spec:
     server: https://kubernetes.default.svc
     namespace: llm
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    # SC-310/SC-315: auto-sync PAUSADO durante la ventana de extraccion de los
+    # deployments BGE a la Application `bge`. Sin `automated:` la app queda en
+    # sync manual y selfHeal (que vive dentro de automated) se apaga, cerrando
+    # por diseno la carrera de re-estampado del tracking-id `ai:`. Reversible
+    # con un PR posterior que restaure el bloque automated tal cual estaba.
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
