@@ -27,6 +27,7 @@ resources:
   - infra/harbor.yaml
   - apps/adguard.yaml
   - apps/ai.yaml
+  - apps/bge.yaml
   - apps/firecrawl.yaml
   - apps/jarvis.yaml
   - apps/libreplay.yaml
@@ -318,6 +319,42 @@ patches:
           namespace: llm
           jsonPointers:
             - /metadata/annotations/autoscaling.keda.sh~1paused-replicas
+  # SC-315: la Application `bge` (ruta BGE extraida de `ai`) sufre el mismo
+  # blanket patch de arriba que REPLAZA /spec/ignoreDifferences, asi que sus 6
+  # entradas de replicas las re-aade este parche dirigido, igual que `ai`. Sin
+  # esto selfHeal revertiria cada `kubectl scale` de compute_mode.py (el selector
+  # del dashboard) en segundos. Los 6 nombres aunque `bge-reranker` (GPU) no
+  # exista hoy como Deployment: ignoreDifferences sobre un Deployment ausente es
+  # un no-op, y coincide con la lista de `ai`.
+  - target:
+      group: argoproj.io
+      version: v1alpha1
+      kind: Application
+      name: bge
+    patch: |-
+      - op: add
+        path: /spec/ignoreDifferences/-
+        value: &bge-replicas
+          group: apps
+          kind: Deployment
+          name: bge-m3-embedding
+          namespace: llm
+          jsonPointers: [/spec/replicas]
+      - op: add
+        path: /spec/ignoreDifferences/-
+        value: { <<: *bge-replicas, name: bge-m3-embedding-cpu }
+      - op: add
+        path: /spec/ignoreDifferences/-
+        value: { <<: *bge-replicas, name: bge-m3-embedding-creative }
+      - op: add
+        path: /spec/ignoreDifferences/-
+        value: { <<: *bge-replicas, name: bge-reranker }
+      - op: add
+        path: /spec/ignoreDifferences/-
+        value: { <<: *bge-replicas, name: bge-reranker-cpu }
+      - op: add
+        path: /spec/ignoreDifferences/-
+        value: { <<: *bge-replicas, name: bge-reranker-creative }
   # The blanket Application patch above REPLACES /spec/ignoreDifferences, so it drops the two
   # target.template paths agentgateway-mcp declares in its own file. ESO defaults both on the
   # backend-tokens ExternalSecret, so without them the app is perpetually OutOfSync. Append
